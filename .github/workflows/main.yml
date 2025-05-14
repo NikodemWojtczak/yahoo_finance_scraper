@@ -43,22 +43,19 @@ jobs:
         sudo apt-get install -y google-chrome-stable
         CHROME_VERSION_FULL=$(google-chrome --version | awk '{print $3}')
         echo "Installed Chrome version: $CHROME_VERSION_FULL"
-        # Install ChromeDriver (using the new JSON endpoints)
-        # Get major Chrome version
+
+        # Get the major version of Chrome
         CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION_FULL | cut -d. -f1)
-        echo "Chrome Major Version: $CHROME_MAJOR_VERSION"
-        # Find the latest known good version for this major version, or stable if that's easier
-        # Using the latest stable for simplicity, ensure your tests are compatible
-        CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/LATEST_RELEASE_STABLE"
-        CHROMEDRIVER_VERSION=$(wget -qO- $CHROMEDRIVER_URL)
+
+        # Fetch the corresponding ChromeDriver version
+        CHROMEDRIVER_VERSION=$(wget -qO- "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION")
         echo "Attempting to download ChromeDriver version: $CHROMEDRIVER_VERSION"
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip"
+
+        # Download and set up ChromeDriver
+        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
         sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
-        sudo mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo rm -rf /tmp/chromedriver.zip /usr/local/bin/chromedriver-linux64
         sudo chmod +x /usr/local/bin/chromedriver
         chromedriver --version
-
 
     - name: Install Python dependencies
       run: |
