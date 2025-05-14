@@ -1,0 +1,8 @@
+pandas
+selenium
+beautifulsoup4
+openpyxl # Often a pd.read_html or to_excel dependency
+lxml     # Often a pd.read_html dependency
+pytest   # For testing
+requests # Not directly used in scraper but good for health checks or simpler tasks if Selenium not needed
+python-dotenv
