@@ -46,18 +46,80 @@ jobs:
         CHROME_VERSION_FULL=$(google-chrome --version | awk '{print $3}')
         echo "Installed Chrome version: $CHROME_VERSION_FULL"
 
-        # Get the major version of Chrome
-        CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION_FULL | cut -d. -f1)
+        # For Chrome 115+, use the new JSON endpoints
+        CHROME_MAJOR_VERSION=$(echo "$CHROME_VERSION_FULL" | cut -d. -f1)
 
-        # Fetch the corresponding ChromeDriver version
-        CHROMEDRIVER_VERSION=$(wget -qO- "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION")
-        echo "Attempting to download ChromeDriver version: $CHROMEDRIVER_VERSION"
+        if [ "$CHROME_MAJOR_VERSION" -ge 115 ]; then
+          echo "Chrome version is 115 or newer. Using JSON endpoint to find matching ChromeDriver."
+          # Get the closest available ChromeDriver version for the installed Chrome version
+          CHROMEDRIVER_URL_SUFFIX="LATEST_RELEASE_${CHROME_VERSION_FULL}"
+          # Fallback for cases where the exact version might not be immediately available in LATEST_RELEASE_ (e.g. very new Chrome releases)
+          # First try the full version, then the major.minor.build, then major.minor, then major.
+          CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION_FULL}")
+          if [ -z "$CHROMEDRIVER_VERSION" ]; then
+            CHROME_VERSION_BUILD=$(echo "$CHROME_VERSION_FULL" | cut -d. -f1-3)
+            echo "Exact version not found, trying with build version: ${CHROME_VERSION_BUILD}"
+            CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION_BUILD}")
+          fi
+          if [ -z "$CHROMEDRIVER_VERSION" ]; then
+             CHROME_VERSION_MINOR=$(echo "$CHROME_VERSION_FULL" | cut -d. -f1-2)
+             echo "Build version not found, trying with minor version: ${CHROME_VERSION_MINOR}"
+             CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION_MINOR}")
+          fi
+          if [ -z "$CHROMEDRIVER_VERSION" ]; then
+            echo "Minor version not found, trying with major version: ${CHROME_MAJOR_VERSION}"
+            CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
+          fi
+
+          if [ -z "$CHROMEDRIVER_VERSION" ]; then
+            echo "Could not find a suitable ChromeDriver version for Chrome $CHROME_VERSION_FULL via LATEST_RELEASE files."
+            echo "Attempting to fetch from known good versions JSON endpoint..."
+            # Attempt to get the specific version download URL from the known-good-versions-with-downloads.json
+            # This requires parsing JSON, so jq is useful here. Ensure jq is installed or use alternative parsing.
+            sudo apt-get install -y jq
+            # Find the latest chromedriver for the installed CHROME_VERSION_FULL (up to the build number)
+            TARGET_CHROME_VERSION_PREFIX=$(echo "$CHROME_VERSION_FULL" | awk -F. '{print $1"."$2"."$3}')
+            # Get the download URL for chromedriver linux64
+            CHROMEDRIVER_DOWNLOAD_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json | jq -r --arg prefix "$TARGET_CHROME_VERSION_PREFIX" '.versions[] | select(.version | startswith($prefix)) | .downloads.chromedriver[] | select(.platform=="linux64") | .url' | tail -n1)
+
+            if [ -z "$CHROMEDRIVER_DOWNLOAD_URL" ]; then
+                echo "ERROR: Could not determine ChromeDriver download URL for Chrome $CHROME_VERSION_FULL using JSON endpoints."
+                exit 1
+            else
+                echo "Found ChromeDriver download URL: $CHROMEDRIVER_DOWNLOAD_URL"
+            fi
+          else
+            echo "Found LATEST_RELEASE ChromeDriver version: $CHROMEDRIVER_VERSION"
+            CHROMEDRIVER_DOWNLOAD_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip"
+          fi
+        else
+          echo "Chrome version is older than 115. Using legacy method."
+          # Get the major version of Chrome
+          CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION_FULL | cut -d. -f1)
+          # Fetch the corresponding ChromeDriver version (legacy method)
+          CHROMEDRIVER_VERSION=$(wget -qO- "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION")
+          CHROMEDRIVER_DOWNLOAD_URL="https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+        fi
+
+        echo "Attempting to download ChromeDriver from: $CHROMEDRIVER_DOWNLOAD_URL"
 
         # Download and set up ChromeDriver
-        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-        chromedriver --version
+        wget -O /tmp/chromedriver.zip "$CHROMEDRIVER_DOWNLOAD_URL"
+        if [ $? -ne 0 ]; then
+          echo "ERROR: Failed to download ChromeDriver from $CHROMEDRIVER_DOWNLOAD_URL"
+          # As a last resort, try the old storage URL if the new one failed and we used a LATEST_RELEASE file
+          if [ "$CHROME_MAJOR_VERSION" -ge 115 ] && [[ "$CHROMEDRIVER_DOWNLOAD_URL" == *"chrome-for-testing"* ]] && ! [[ "$CHROMEDRIVER_DOWNLOAD_URL" == *"known-good-versions-with-downloads.json"* ]]; then
+             OLD_STORAGE_URL="https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+             echo "Falling back to legacy storage URL: $OLD_STORAGE_URL"
+             wget -O /tmp/chromedriver.zip "$OLD_STORAGE_URL"
+             if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to download ChromeDriver from legacy URL as well."
+                exit 1
+             fi
+          else
+            exit 1
+          fi
+        fi
 
     - name: Install Python dependencies
       run: |
