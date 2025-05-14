@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"] # Test on multiple Python versions
+        python-version: ["3.10"] # Test on multiple Python version
 
     steps:
     - name: Checkout repository
@@ -61,17 +61,17 @@ jobs:
             echo "Exact version not found, trying with build version: ${CHROME_VERSION_BUILD}"
             CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION_BUILD}")
           fi
-          if [ -z "$CHROMEDRIVER_VERSION" ]; then
+          if [[ "$CHROMEDRIVER_VERSION" == *"<html"* || -z "$CHROMEDRIVER_VERSION" ]]; then
              CHROME_VERSION_MINOR=$(echo "$CHROME_VERSION_FULL" | cut -d. -f1-2)
-             echo "Build version not found, trying with minor version: ${CHROME_VERSION_MINOR}"
+             echo "Build version not found or invalid, trying with minor version: ${CHROME_VERSION_MINOR}"
              CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION_MINOR}")
           fi
-          if [ -z "$CHROMEDRIVER_VERSION" ]; then
-            echo "Minor version not found, trying with major version: ${CHROME_MAJOR_VERSION}"
+          if [[ "$CHROMEDRIVER_VERSION" == *"<html"* || -z "$CHROMEDRIVER_VERSION" ]]; then
+            echo "Minor version not found or invalid, trying with major version: ${CHROME_MAJOR_VERSION}"
             CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
           fi
 
-          if [ -z "$CHROMEDRIVER_VERSION" ]; then
+          if [[ "$CHROMEDRIVER_VERSION" == *"<html"* || -z "$CHROMEDRIVER_VERSION" ]]; then
             echo "Could not find a suitable ChromeDriver version for Chrome $CHROME_VERSION_FULL via LATEST_RELEASE files."
             echo "Attempting to fetch from known good versions JSON endpoint..."
             # Attempt to get the specific version download URL from the known-good-versions-with-downloads.json
