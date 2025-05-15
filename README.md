@@ -7,10 +7,10 @@ This project is a web scraper designed to fetch historical stock price data from
 ```
 yahoo_finance_scraper/
 ├── .dockerignore         # Specifies intentionally untracked files that Docker should ignore
-├── .env                  # Environment variables (YAHOO_EMAIL, YAHOO_PASSWORD) - Create this file
+├── .env.example          # Template for .env file
+├── .env                  # Environment variables (YAHOO_EMAIL, YAHOO_PASSWORD) - Create this file from .env.example
 ├── .github/              # GitHub specific files (e.g., workflows for CI/CD)
 ├── .gitignore            # Specifies intentionally untracked files that Git should ignore
-├── .pytest_cache/        # Pytest cache directory
 ├── Dockerfile            # Defines the Docker image for the scraper
 ├── README.md             # This file
 ├── entrypoint.sh         # Script executed when the Docker container starts
@@ -31,7 +31,7 @@ yahoo_finance_scraper/
     - `beautifulsoup4`
     - `openpyxl`
     - `lxml`
-    - `pytest` (for development/testing)
+    - `pytest` 
     - `requests`
     - `python-dotenv`
 
@@ -47,8 +47,8 @@ cd yahoo_finance_scraper
 The scraper requires Yahoo Finance login credentials. Create a `.env` file in the root of the `yahoo_finance_scraper` directory with the following content:
 
 ```env
-YAHOO_EMAIL=\"your_yahoo_email@example.com\"
-YAHOO_PASSWORD=\"your_yahoo_password\"
+YAHOO_EMAIL="your_yahoo_email@example.com"
+YAHOO_PASSWORD="your_yahoo_password"
 ```
 **Note:** This `.env` file is copied into the Docker image during the build process by the `Dockerfile`. Ensure it is present before building the Docker image if you intend to use the login feature. The `scraper.py` script also loads these variables using `python-dotenv` if run directly.
 
